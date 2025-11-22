@@ -1,5 +1,7 @@
 # AI-Driven Personalized Investment & Financial Advisor
 
+https://financialadvisorcri.streamlit.app/
+
 A comprehensive Python-based application that uses machine learning to provide personalized investment advice and financial planning recommendations.
 
 ## 🚀 Features
