@@ -25,3 +25,6 @@ streamlit-authenticator>=0.4.2
 # PDF generation
 reportlab>=4.0
 
+
+# AI model
+google-generativeai>=0.4.0

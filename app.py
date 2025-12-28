@@ -59,6 +59,10 @@ def main():
         # Logout button
         if st.button("🚪 Logout"):
             logout()
+            
+        # Debug section
+        with st.expander("Debug State"):
+            st.write(st.session_state)
     
     # Main content area
     if page == "📊 Dashboard":
@@ -317,25 +321,39 @@ def analysis_page():
         with col2:
             # Allocation table
             try:
-                allocation_df = pd.DataFrame([
-                    {
-                        'Category': category.replace('_', ' ').title(),
-                        'Percentage': f"{data['percentage']:.1f}%",
-                        'Amount': f"${data['amount']:,.0f}",
-                        'Description': data.get('description', 'N/A')
-                    }
-                    for category, data in allocation_data.items()
-                    if isinstance(data, dict) and data.get('percentage', 0) > 0
-                ])
+                # Use advice_data for detailed breakdown if available
+                if advice_data and 'investment_breakdown' in advice_data:
+                    table_data = advice_data['investment_breakdown']
+                    allocation_df = pd.DataFrame([
+                        {
+                            'Category': data.get('description', category.replace('_', ' ').title()),
+                            'Percentage': f"{data['percentage']:.1f}%",
+                            'Amount': f"${data['amount']:,.0f}",
+                            'Description': data.get('description', 'N/A')
+                        }
+                        for category, data in table_data.items()
+                    ])
+                else:
+                    # Fallback to allocation_data if advice_data is missing
+                    allocation_df = pd.DataFrame([
+                        {
+                            'Category': category.replace('_', ' ').title(),
+                            'Percentage': f"{percentage*100:.1f}%",
+                            'Amount': "N/A",
+                            'Description': "N/A"
+                        }
+                        for category, percentage in allocation_data.items()
+                        if percentage > 0
+                    ])
                 
                 if not allocation_df.empty:
                     st.dataframe(allocation_df, use_container_width=True)
                 else:
-                    st.info("No allocation data available. Please complete the analysis first.")
+                    st.info("No allocation data available.")
             except Exception as e:
                 st.error(f"Error displaying allocation data: {str(e)}")
-                st.info("Please complete the analysis in the 'Input Data' tab first.")
     else:
+        st.write(f"Debug: allocation_data is empty or None. Type: {type(allocation_data)}")
         st.info("No allocation data available. Please complete the analysis in the 'Input Data' tab first.")
         # Show empty pie chart
         fig = visualizer.create_pie_chart({})
@@ -345,11 +363,19 @@ def analysis_page():
     if advice_data:
         st.subheader("Personalized Recommendations")
         
-        st.write(advice_data.get('summary', 'No summary available.'))
-        
-        st.write("**Key Recommendations:**")
-        for i, recommendation in enumerate(advice_data.get('recommendations', []), 1):
-            st.write(f"{i}. {recommendation}")
+        # Check for AI Analysis
+        if advice_data.get('ai_analysis'):
+            st.markdown("### 🤖 AI Financial Advisor")
+            st.markdown(advice_data['ai_analysis'])
+            st.markdown("---")
+            st.caption("AI-generated advice based on your profile and goals.")
+        else:
+            # Fallback to rule-based
+            st.write(advice_data.get('summary', 'No summary available.'))
+            
+            st.write("**Key Recommendations:**")
+            for i, recommendation in enumerate(advice_data.get('recommendations', []), 1):
+                st.write(f"{i}. {recommendation}")
     
     # Additional visualizations
     st.subheader("Additional Analysis")

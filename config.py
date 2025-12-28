@@ -7,7 +7,8 @@ import os
 DATABASE_PATH = "user_data.db"
 
 # API Keys (add your own keys here)
-ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY", "demo")
+ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY", "your_alpha_vantage_key")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "your_groq_api_key")
 
 # Investment categories and their risk levels
 INVESTMENT_CATEGORIES = {

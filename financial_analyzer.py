@@ -9,6 +9,8 @@ from sklearn.model_selection import train_test_split
 import yfinance as yf
 from datetime import datetime, timedelta
 import warnings
+import config
+from groq import Groq
 warnings.filterwarnings('ignore')
 
 class FinancialAnalyzer:
@@ -182,7 +184,7 @@ class FinancialAnalyzer:
     
     def generate_advice_report(self, user_data, analysis_result, allocation, market_data):
         """
-        Generate personalized financial advice report
+        Generate personalized financial advice report using Gemini API
         """
         risk_category = analysis_result['risk_category']
         expected_return = analysis_result['expected_return']
@@ -190,14 +192,16 @@ class FinancialAnalyzer:
         # Calculate investment amounts
         investable_amount = user_data['savings'] * 0.8  # Use 80% of savings for investment
         
+        # Default tailored advice (fallback)
         advice = {
             'summary': f"Based on your profile, you have a {risk_category} risk tolerance with an expected annual return of {expected_return:.1%}.",
             'recommendations': [],
             'investment_breakdown': {},
-            'market_insights': market_data
+            'market_insights': market_data,
+            'ai_analysis': None
         }
         
-        # Generate specific recommendations
+        # Generate specific (rule-based) recommendations
         if risk_category == "low":
             advice['recommendations'].append("Focus on capital preservation with fixed deposits and government bonds.")
             advice['recommendations'].append("Consider a small allocation to mutual funds for growth.")
@@ -208,7 +212,7 @@ class FinancialAnalyzer:
             advice['recommendations'].append("Embrace growth opportunities with higher stock allocation.")
             advice['recommendations'].append("Consider crypto for diversification, but limit exposure.")
         
-        # Calculate investment amounts
+        # Calculate investment amounts for breakdown
         for category, percentage in allocation.items():
             if percentage > 0:
                 amount = investable_amount * percentage
@@ -217,6 +221,60 @@ class FinancialAnalyzer:
                     'amount': amount,
                     'description': self._get_category_description(category)
                 }
+                
+        # --- Gemini Integration ---
+        # --- Groq Integration ---
+        if hasattr(config, 'GROQ_API_KEY') and config.GROQ_API_KEY and config.GROQ_API_KEY != "your_groq_api_key_here":
+            try:
+                client = Groq(api_key=config.GROQ_API_KEY)
+                
+                # Construct Prompt
+                goals_text = "\n".join([f"- {g['description']} (${g['amount']:,} in {g['timeframe']} years)" for g in user_data.get('goals', [])])
+                allocation_text = "\n".join([f"- {k.replace('_', ' ').title()}: {v*100:.1f}%" for k,v in allocation.items() if v > 0])
+                
+                prompt = f"""
+                Act as an expert financial advisor. Analyze the following user profile and provide personalized, actionable investment advice.
+                
+                **User Profile:**
+                - Age: {user_data['age']}
+                - Annual Income: ${user_data['income']:,}
+                - Annual Expenses: ${user_data['expenses']:,}
+                - Current Savings: ${user_data['savings']:,}
+                - Risk Tolerance Score: {analysis_result['risk_score']:.2f} ({risk_category.upper()})
+                - Investable Capital: ${investable_amount:,.2f}
+                
+                **Financial Goals:**
+                {goals_text if goals_text else "No specific goals listed."}
+                
+                **Recommended Allocation (Algorithm Generated):**
+                {allocation_text}
+                
+                **Task:**
+                1. **Executive Summary**: Briefly assess their financial health and risk alignment.
+                2. **Goal Analysis**: Specifically address how they can achieve their stated goals with this capital. Are the goals realistic? What monthly contribution is needed?
+                3. **Portfolio Strategy**: Explain *why* the recommended allocation makes sense for them. Suggest specific types of funds or sectors (e.g., "Look for index funds tracking the S&P 500" or "Short-term government bonds").
+                4. **Action Plan**: Give 3 concrete next steps they should take this week.
+                
+                Format the output in clean Markdown. Be encouraging but realistic.
+                """
+                
+                completion = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful and expert financial advisor."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=1024,
+                )
+                
+                advice['ai_analysis'] = completion.choices[0].message.content
+                
+            except Exception as e:
+                print(f"Groq API Error: {e}")
+                advice['ai_analysis'] = f"**AI Analysis Unavailable:** {str(e)}"
+        else:
+             advice['ai_analysis'] = "**AI Analysis Unavailable:** Please configure GROQ_API_KEY in config.py"
         
         return advice
     
